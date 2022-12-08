@@ -4,6 +4,11 @@
 
 import init from "calc-s2-rust";
 
+const sleep = async (ms: number) =>
+  new Promise<void>((resolve, reject) => {
+    setTimeout(() => resolve(), ms);
+  });
+
 class WasmRenderManager {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   wasm: any | null;
@@ -41,9 +46,9 @@ class WasmRenderManager {
 
 const wasmManager = new WasmRenderManager();
 const canvas = document.getElementById("canvas")! as HTMLCanvasElement;
-const DEFAULT_AREA = 4800;
-const MAX_WIDTH = 120;
-const MAX_HEIGHT = 80;
+const DEFAULT_AREA = 30000;
+const MAX_WIDTH = 300;
+const MAX_HEIGHT = 200;
 const kernel = [1, 2, 1, 2, 4, 2, 1, 2, 1];
 
 function reComputeCanvasSize(width, height) {
@@ -67,32 +72,34 @@ function reComputeCanvasSize(width, height) {
 }
 
 async function benchMark() {
-  const [ctx, width, height] = await initCanvas();
+  const { ctx, width, height } = await initCanvas();
   // eslint-disable-next-line no-console
   console.log("initCanvas success");
   const times = 10;
   let wasmCost = 0;
   let jsCost = 0;
-  // for(let i = 0; i < times; i += 1) {
-  //   const begin = window.performance.now();
-  //   testWasm(ctx, width, height);
-  //   wasmCost += (window.performance.now() - begin);
-  //   // eslint-disable-next-line no-console
-  //   console.log('wasm time:', i);
-  // }
-  // wasmCost /= times;
-  // for(let i = 0; i < times; i += 1) {
-  //   const begin = window.performance.now();
-  //   testJS(ctx, width, height);
-  //   jsCost += (window.performance.now() - begin);
-  //   // eslint-disable-next-line no-console
-  //   console.log('js time:', i);
-  // }
-  // jsCost /= times;
-  // // eslint-disable-next-line no-console
-  // console.log('[result] wasm cost:', wasmCost);
-  // // eslint-disable-next-line no-console
-  // console.log('[result] js cost:', jsCost);
+  //   for (let i = 0; i < times; i += 1) {
+  //     const begin = window.performance.now();
+  //     testWasm(ctx, width, height);
+  //     wasmCost += window.performance.now() - begin;
+  //     // eslint-disable-next-line no-console
+  //     console.log("wasm time:", i);
+  //   }
+  wasmCost /= times;
+  for (let i = 0; i < times; i += 1) {
+    const begin = window.performance.now();
+    testJS(ctx, width, height);
+    jsCost += window.performance.now() - begin;
+    // eslint-disable-next-line no-console
+    console.log("js time:", i);
+    ctx!.clearRect(0, 0, width, height);
+    await sleep(1000);
+  }
+  jsCost /= times;
+  // eslint-disable-next-line no-console
+  console.log("[result] wasm cost:", wasmCost);
+  // eslint-disable-next-line no-console
+  console.log("[result] js cost:", jsCost);
 }
 
 function resizeCanvas(imgWidth, imgHeight) {
@@ -115,8 +122,9 @@ async function initCanvas(url?: string) {
   const res = resizeCanvas(MAX_WIDTH, MAX_HEIGHT);
   const ctx = canvas.getContext("2d");
   await initWasm(ctx, res.width, res.height);
+  await sleep(1000);
   initJS(ctx, res.width, res.height);
-  return [ctx, res.width, res.height];
+  return { ctx, ...res };
 }
 
 async function initWasm(ctx, width, height) {
@@ -127,29 +135,38 @@ async function initWasm(ctx, width, height) {
     width,
     height
   );
-  // let begin = window.performance.now();
-  // for(let i = 0; i < imageData.data.length; i += 1) {
-  //   imageData.data[i] = window.__random();
-  // }
-  // let cost = window.performance.now() - begin;
-  // console.log('write cost:', cost);
+  await sleep(1000);
+  let begin = window.performance.now();
+  for (let i = 0; i < imageData.data.length; i += 1) {
+    imageData.data[i] = (window as any).__random();
+  }
+  let cost = window.performance.now() - begin;
+  console.log("initWasm write cost:", cost);
+  ctx.putImageData(imageData, 0, 0);
   return imageData;
 }
 
 function testWasm(ctx, width, height) {
+  debugger;
   wasmManager.convolution("test", width, height, kernel);
 }
 
 function initJS(ctx, width, height) {
-  (window as any).buffer = new Uint8ClampedArray(width * height * 4);
+  const buffer = new Uint8ClampedArray(width * height * 4);
+  (window as any).buffer = buffer;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  // let begin = window.performance.now();
-  // for(let val in buffer) {
-  //   val = window.__random();
-  // }
-  // let cost = window.performance.now() - begin;
-  // console.log('write cost js:', cost);
-  return new ImageData((window as any).buffer, width, height);
+  let begin = window.performance.now();
+  //   for (let val in buffer) {
+  //     debugger;
+  //     val = (window as any).__random();
+  //   }
+  for (let i = 0; i < buffer.length; i++) {
+    buffer[i] = (window as any).__random();
+  }
+  let cost = window.performance.now() - begin;
+  console.log("write cost js:", cost, "buffer", buffer);
+  ctx.putImageData(new ImageData(buffer, width, height), 0, 0);
+  //   return new ImageData(buffer, width, height);
 }
 
 async function testJS(ctx, width, height) {
@@ -181,6 +198,7 @@ async function testJS(ctx, width, height) {
       buffer[width * j * 4 + i * 4 + 1] = newG;
       buffer[width * j * 4 + i * 4 + 2] = newB;
     }
+    ctx.putImageData(new ImageData(buffer, width, height), 0, 0);
   }
 }
 

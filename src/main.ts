@@ -1,6 +1,6 @@
-// window.__random = () => {
-//   return Math.floor(Math.random() * 256);
-// };
+(window as any).__random = () => {
+  return Math.floor(Math.random() * 256);
+};
 
 import init from "calc-s2-rust";
 
@@ -14,13 +14,12 @@ class WasmRenderManager {
       //   const js = import("calc-s2-rust/calc_s2_rust_bg.wasm?init");
       init()
         .then((instance) => {
-          debugger;
           this.wasm = instance;
+          (window as any).wasm = instance;
           instance.set_wasm_panic_hook();
           rs(1);
         })
         .catch((e) => {
-          debugger;
           rj();
         });
     });
@@ -28,8 +27,9 @@ class WasmRenderManager {
   allocImageData(key: string, len: number, width: number, height?: number) {
     console.log("allocImageData: len:", len, "key:", key);
     let begin = window.performance.now();
-    const ptr = this.wasm!.new_buffer(key, len);
-    const u8Arr = new Uint8ClampedArray(this.wasm!.get_wasm_buffer(), ptr, len);
+    // const ptr = this.wasm!.new_buffer(key, len);
+    const ptr = this.wasm!.new_buffer();
+    const u8Arr = new Uint8ClampedArray(this.wasm!.memory.buffer, ptr, len);
     const imageData = new ImageData(u8Arr, width, height);
     console.log("allocImageData cost!!:", window.performance.now() - begin);
     return imageData;
@@ -41,9 +41,9 @@ class WasmRenderManager {
 
 const wasmManager = new WasmRenderManager();
 const canvas = document.getElementById("canvas")! as HTMLCanvasElement;
-const DEFAULT_AREA = 480000;
-const MAX_WIDTH = 1200;
-const MAX_HEIGHT = 800;
+const DEFAULT_AREA = 4800;
+const MAX_WIDTH = 120;
+const MAX_HEIGHT = 80;
 const kernel = [1, 2, 1, 2, 4, 2, 1, 2, 1];
 
 function reComputeCanvasSize(width, height) {

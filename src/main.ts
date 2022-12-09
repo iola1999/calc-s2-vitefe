@@ -1,205 +1,87 @@
 (window as any).__random = () => {
   return Math.floor(Math.random() * 256);
 };
-
-import init from "calc-s2-rust";
-
-const sleep = async (ms: number) =>
-  new Promise<void>((resolve, reject) => {
-    setTimeout(() => resolve(), ms);
-  });
-
+import init, { InitOutput, new_buffer, calc_s2 } from "calc-s2-rust";
+import { resolveImageToRgba } from "./resolveImage";
 class WasmRenderManager {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  wasm: any | null;
-
+  wasm: InitOutput | null = null;
   async init() {
     return new Promise((rs, rj) => {
-      // @ts-ignore
-      //   const js = import("calc-s2-rust/calc_s2_rust_bg.wasm?init");
       init()
-        .then((instance) => {
+        .then((instance: InitOutput) => {
           this.wasm = instance;
           (window as any).wasm = instance;
           instance.set_wasm_panic_hook();
           rs(1);
         })
-        .catch((e) => {
-          rj();
+        .catch((e: any) => {
+          rj(e);
         });
     });
   }
-  allocImageData(key: string, len: number, width: number, height?: number) {
+  allocImageData(key: string, len: number) {
     console.log("allocImageData: len:", len, "key:", key);
-    let begin = window.performance.now();
-    // const ptr = this.wasm!.new_buffer(key, len);
-    const ptr = this.wasm!.new_buffer();
-    const u8Arr = new Uint8ClampedArray(this.wasm!.memory.buffer, ptr, len);
-    const imageData = new ImageData(u8Arr, width, height);
-    console.log("allocImageData cost!!:", window.performance.now() - begin);
-    return imageData;
+    const ptr = new_buffer(key, len);
+    // const u8Arr = new Uint8ClampedArray(this.wasm!.memory.buffer, ptr, len);
+    // const imageData = new ImageData(u8Arr, width, height);
+    // return imageData;
+    return ptr;
   }
-  convolution(key: string, width: number, height: number, kernel: number[]) {
-    this.wasm.convolution(key, width, height, kernel);
-  }
+}
+function initJS(width: number, height: number) {
+  // const buffer = new Uint8ClampedArray(width * height * 4);
+  // ctx.putImageData(new ImageData(buffer, width, height), 0, 0);
 }
 
 const wasmManager = new WasmRenderManager();
-const canvas = document.getElementById("canvas")! as HTMLCanvasElement;
-const DEFAULT_AREA = 30000;
-const MAX_WIDTH = 300;
-const MAX_HEIGHT = 200;
-const kernel = [1, 2, 1, 2, 4, 2, 1, 2, 1];
+await wasmManager.init();
 
-function reComputeCanvasSize(width, height) {
-  const k = height / width;
-  let resultWidth = Math.floor(Math.sqrt(DEFAULT_AREA / k));
-  let resultHeight = 0;
-  if (resultWidth > MAX_WIDTH) {
-    resultWidth = MAX_WIDTH;
-    resultHeight = resultWidth * k;
-  } else {
-    resultHeight = resultWidth * k;
-    if (resultHeight > MAX_HEIGHT) {
-      resultHeight = MAX_HEIGHT;
-      resultWidth = resultHeight / k;
-    }
-  }
-  return {
-    width: resultWidth,
-    height: Math.floor(resultHeight),
-  };
-}
+const image1El = document.querySelector("#image1") as HTMLInputElement;
+const image2El = document.querySelector("#image2") as HTMLInputElement;
+const calcEl = document.querySelector("#calc") as HTMLButtonElement;
 
-async function benchMark() {
-  const { ctx, width, height } = await initCanvas();
-  // eslint-disable-next-line no-console
-  console.log("initCanvas success");
-  const times = 10;
-  let wasmCost = 0;
-  let jsCost = 0;
-  //   for (let i = 0; i < times; i += 1) {
-  //     const begin = window.performance.now();
-  //     testWasm(ctx, width, height);
-  //     wasmCost += window.performance.now() - begin;
-  //     // eslint-disable-next-line no-console
-  //     console.log("wasm time:", i);
-  //   }
-  wasmCost /= times;
-  for (let i = 0; i < times; i += 1) {
-    const begin = window.performance.now();
-    testJS(ctx, width, height);
-    jsCost += window.performance.now() - begin;
-    // eslint-disable-next-line no-console
-    console.log("js time:", i);
-    ctx!.clearRect(0, 0, width, height);
-    await sleep(1000);
-  }
-  jsCost /= times;
-  // eslint-disable-next-line no-console
-  console.log("[result] wasm cost:", wasmCost);
-  // eslint-disable-next-line no-console
-  console.log("[result] js cost:", jsCost);
-}
-
-function resizeCanvas(imgWidth, imgHeight) {
-  const result = reComputeCanvasSize(imgWidth, imgHeight);
-  canvas.style.width = `${result.width}px`;
-  canvas.style.height = `${result.height}px`;
-  // eslint-disable-next-line no-multi-assign
-  const width = (canvas.width = result.width * 2);
-  // eslint-disable-next-line no-multi-assign
-  const height = (canvas.height = result.height * 2);
-  //   size = width * height;
-  //   memSize = width * height * 4 * 2 + 9 * 4 * 2; // rgba for one pixel
-  return {
-    width,
-    height,
-  };
-}
-
-async function initCanvas(url?: string) {
-  const res = resizeCanvas(MAX_WIDTH, MAX_HEIGHT);
-  const ctx = canvas.getContext("2d");
-  await initWasm(ctx, res.width, res.height);
-  await sleep(1000);
-  initJS(ctx, res.width, res.height);
-  return { ctx, ...res };
-}
-
-async function initWasm(ctx, width, height) {
-  await wasmManager.init();
-  const imageData = wasmManager.allocImageData(
-    "test",
-    width * height * 4,
-    width,
-    height
+const writeImageFileRgbToWasm = async (file: File, imageKey: string) => {
+  const { data: jsU8ca, width, height } = await resolveImageToRgba(file);
+  console.log("jsU8ca", jsU8ca);
+  if (!jsU8ca) return;
+  const memLength = width * height * 3;
+  const bufferPtr = wasmManager.allocImageData(imageKey, memLength);
+  console.log("bufferPtr", bufferPtr);
+  const wasmU8ca = new Uint8ClampedArray(
+    wasmManager.wasm!.memory.buffer,
+    bufferPtr,
+    memLength
   );
-  await sleep(1000);
-  let begin = window.performance.now();
-  for (let i = 0; i < imageData.data.length; i += 1) {
-    imageData.data[i] = (window as any).__random();
-  }
-  let cost = window.performance.now() - begin;
-  console.log("initWasm write cost:", cost);
-  ctx.putImageData(imageData, 0, 0);
-  return imageData;
-}
-
-function testWasm(ctx, width, height) {
-  debugger;
-  wasmManager.convolution("test", width, height, kernel);
-}
-
-function initJS(ctx, width, height) {
-  const buffer = new Uint8ClampedArray(width * height * 4);
-  (window as any).buffer = buffer;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  let begin = window.performance.now();
-  //   for (let val in buffer) {
-  //     debugger;
-  //     val = (window as any).__random();
-  //   }
-  for (let i = 0; i < buffer.length; i++) {
-    buffer[i] = (window as any).__random();
-  }
-  let cost = window.performance.now() - begin;
-  console.log("write cost js:", cost, "buffer", buffer);
-  ctx.putImageData(new ImageData(buffer, width, height), 0, 0);
-  //   return new ImageData(buffer, width, height);
-}
-
-async function testJS(ctx, width, height) {
-  const { buffer } = window as any;
-  const kernel_length = kernel.reduce((a, b) => a + b);
-  for (let i = 1; i < width - 1; i += 1) {
-    for (let j = 1; j < height - 1; j += 1) {
-      let newR = 0;
-      let newG = 0;
-      let newB = 0;
-      for (let x = 0; x < 3; x += 1) {
-        // 取前后左右共9个格子
-        for (let y = 0; y < 3; y += 1) {
-          newR +=
-            (buffer[width * (j + y - 1) * 4 + (i + x - 1) * 4 + 0] *
-              kernel[y * 3 + x]) /
-            kernel_length;
-          newG +=
-            (buffer[width * (j + y - 1) * 4 + (i + x - 1) * 4 + 1] *
-              kernel[y * 3 + x]) /
-            kernel_length;
-          newB +=
-            (buffer[width * (j + y - 1) * 4 + (i + x - 1) * 4 + 2] *
-              kernel[y * 3 + x]) /
-            kernel_length;
-        }
-      }
-      buffer[width * j * 4 + i * 4 + 0] = newR;
-      buffer[width * j * 4 + i * 4 + 1] = newG;
-      buffer[width * j * 4 + i * 4 + 2] = newB;
+  console.log("wasmU8ca", wasmU8ca);
+  // 提前读一次就写不进去了，奇怪
+  // console.log("wasm buffer:");
+  // print_buffer(imageKey);
+  for (let row = 0; row < height; row += 1) {
+    for (let column = 0; column < width; column += 1) {
+      debugger;
+      wasmU8ca[(row * width + column) * 3] = jsU8ca[(row * width + column) * 4];
+      wasmU8ca[(row * width + column) * 3 + 1] =
+        jsU8ca[(row * width + column) * 4 + 1];
+      wasmU8ca[(row * width + column) * 3 + 2] =
+        jsU8ca[(row * width + column) * 4 + 2];
     }
-    ctx.putImageData(new ImageData(buffer, width, height), 0, 0);
   }
-}
+  console.log("wasmU8ca after copy", wasmU8ca);
+  console.log("wasm buffer after copy:");
+  // print_buffer(imageKey);
+};
 
-benchMark();
+image1El.addEventListener("change", async (evt: any) => {
+  const file = evt.target!.files[0];
+  await writeImageFileRgbToWasm(file, "img1");
+});
+
+image2El.addEventListener("change", async (evt: any) => {
+  const file = evt.target!.files[0];
+  await writeImageFileRgbToWasm(file, "img2");
+});
+
+calcEl.addEventListener("click", () => {
+  const result = calc_s2("img1", "img2", 800, 600);
+  console.log("calc_s2 result", result);
+});

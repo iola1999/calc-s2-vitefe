@@ -42,6 +42,8 @@ const calcEl = document.querySelector("#calc") as HTMLButtonElement;
 
 const writeImageFileRgbToWasm = async (file: File, imageKey: string) => {
   const { data: jsU8ca, width, height } = await resolveImageToRgba(file);
+  (window as any).imgWidth = width;
+  (window as any).imgHeight = height;
   console.log("jsU8ca", jsU8ca);
   if (!jsU8ca) return;
   const memLength = width * height * 3;
@@ -58,7 +60,6 @@ const writeImageFileRgbToWasm = async (file: File, imageKey: string) => {
   // print_buffer(imageKey);
   for (let row = 0; row < height; row += 1) {
     for (let column = 0; column < width; column += 1) {
-      debugger;
       wasmU8ca[(row * width + column) * 3] = jsU8ca[(row * width + column) * 4];
       wasmU8ca[(row * width + column) * 3 + 1] =
         jsU8ca[(row * width + column) * 4 + 1];
@@ -82,6 +83,11 @@ image2El.addEventListener("change", async (evt: any) => {
 });
 
 calcEl.addEventListener("click", () => {
-  const result = calc_s2("img1", "img2", 800, 600);
+  const result = calc_s2(
+    "img1",
+    "img2",
+    (window as any).imgWidth,
+    (window as any).imgHeight
+  );
   console.log("calc_s2 result", result);
 });

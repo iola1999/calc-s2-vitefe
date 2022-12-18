@@ -122,6 +122,11 @@
   resolved "https://registry.npmmirror.com/@esbuild/win32-x64/-/win32-x64-0.16.2.tgz#01350ef54fb4b2a0b423072d30deceaa5c1c529e"
   integrity sha512-1+PQiGAbbGlIXXlp9i/5JRpodCsozGTjffaD4W1LgeoynWef38VD8NNC8yG366NYXHHHLR1pN6MQZ9r2na/S1A==
 
+calc-s2-rust@^1.0.3:
+  version "1.0.3"
+  resolved "https://registry.npmmirror.com/calc-s2-rust/-/calc-s2-rust-1.0.3.tgz#8e007b04ad97520a9436b6585556c573d1b128e8"
+  integrity sha512-P2VhE10igqN4PWtmceIR7/wSQWIpnTMzSNTWKiSykG+Ojymu9mEDhdsP7yyO/KG1sRcESXE2vNTskZ2ojiY56A==
+
 esbuild-android-64@0.15.18:
   version "0.15.18"
   resolved "https://registry.npmmirror.com/esbuild-android-64/-/esbuild-android-64-0.15.18.tgz#20a7ae1416c8eaade917fb2453c1259302c637a5"

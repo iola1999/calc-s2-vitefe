@@ -34,13 +34,12 @@ class WasmRenderManager {
 //   ctx.putImageData(new ImageData(buffer, width, height), 0, 0);
 // }
 
-const wasmManager = new WasmRenderManager();
-await wasmManager.init();
-
 const image1El = document.querySelector("#image1") as HTMLInputElement;
 const image2El = document.querySelector("#image2") as HTMLInputElement;
 const calcEl = document.querySelector("#calc") as HTMLButtonElement;
 const resultEl = document.querySelector("#result") as HTMLDivElement;
+
+const wasmManager = new WasmRenderManager();
 
 const writeImageFileRgbToWasm = async (file: File, imageKey: string) => {
   const { data: jsU8ca, width, height } = await resolveImageToRgba(file);
@@ -74,29 +73,31 @@ const writeImageFileRgbToWasm = async (file: File, imageKey: string) => {
   // print_buffer(imageKey);
 };
 
-image1El.addEventListener("change", async (evt: any) => {
-  const file = evt.target!.files[0];
-  await writeImageFileRgbToWasm(file, "img1");
-  calcEl.disabled = !(image1El.value && image2El.value);
-});
+wasmManager.init().then(() => {
+  image1El.addEventListener("change", async (evt: any) => {
+    const file = evt.target!.files[0];
+    await writeImageFileRgbToWasm(file, "img1");
+    calcEl.disabled = !(image1El.value && image2El.value);
+  });
 
-image2El.addEventListener("change", async (evt: any) => {
-  const file = evt.target!.files[0];
-  await writeImageFileRgbToWasm(file, "img2");
-  calcEl.disabled = !(image1El.value && image2El.value);
-});
+  image2El.addEventListener("change", async (evt: any) => {
+    const file = evt.target!.files[0];
+    await writeImageFileRgbToWasm(file, "img2");
+    calcEl.disabled = !(image1El.value && image2El.value);
+  });
 
-calcEl.addEventListener("click", () => {
-  calcEl.disabled = true;
-  const result = calc_s2(
-    "img1",
-    "img2",
-    (window as any).imgWidth,
-    (window as any).imgHeight
-  );
-  console.log("calc_s2 result", result);
-  resultEl.innerText = `result is: ${result}`;
-  image1El.value = "";
-  image2El.value = "";
-  calcEl.disabled = !(image1El.value && image2El.value);
+  calcEl.addEventListener("click", () => {
+    calcEl.disabled = true;
+    const result = calc_s2(
+      "img1",
+      "img2",
+      (window as any).imgWidth,
+      (window as any).imgHeight
+    );
+    console.log("calc_s2 result", result);
+    resultEl.innerText = `result is: ${result}`;
+    image1El.value = "";
+    image2El.value = "";
+    calcEl.disabled = !(image1El.value && image2El.value);
+  });
 });

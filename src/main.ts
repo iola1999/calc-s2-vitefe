@@ -29,10 +29,10 @@ class WasmRenderManager {
   }
 }
 
-function initJS(width: number, height: number) {
-  // const buffer = new Uint8ClampedArray(width * height * 4);
-  // ctx.putImageData(new ImageData(buffer, width, height), 0, 0);
-}
+// function initJS(width: number, height: number) {
+//   const buffer = new Uint8ClampedArray(width * height * 4);
+//   ctx.putImageData(new ImageData(buffer, width, height), 0, 0);
+// }
 
 const wasmManager = new WasmRenderManager();
 await wasmManager.init();
